@@ -82,9 +82,12 @@ void main(void)
         {
             CPUTimer_clearOverflowFlag(rs422Handle->timerHandle);
             task1(NULL);
+
+            // 1ms
+            RS422_COMM_SCI_read(rs422Handle);
+            updateRxParam(rs422Handle);
         }
-        RS422_COMM_SCI_read(rs422Handle);
-        updateRxParam(rs422Handle);
+
     }
 }
 void updateTxBuff(RS422_COMM_SCI_Handle handle)

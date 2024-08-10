@@ -214,52 +214,99 @@ void RS422_COMM_SCI_read(RS422_COMM_SCI_Handle handle)
     RS422_COMM_SCI_Obj *obj = (RS422_COMM_SCI_Obj*)handle;
     obj->rxTimeOutTicker++;
     uint16_t i;
-    if(SCI_getRxFIFOStatus(obj->sciHandle) == SCI_FIFO_RX13)
+//    if(SCI_getRxFIFOStatus(obj->sciHandle) == SCI_FIFO_RX13)
+//    {
+//        obj->rxTimeOutTicker = 0;
+//        SCI_clearOverflowStatus(obj->sciHandle);
+//        SCI_clearInterruptStatus(obj->sciHandle, SCI_INT_RXFF);
+//    }
+//    else
+//    {
+//        obj->rxTimeOutTickerFifo12++;
+//    }
+//    // The first time out
+//    if(obj->rxTimeOutTickerFifo12 > 200U)
+//    {
+//        obj->rxTimeOutTickerFifo12 = 0U;
+//        if(SCI_getRxFIFOStatus(obj->sciHandle) == SCI_FIFO_RX5)
+//        {
+//            obj->rxTimeOutTicker = 0;
+//            obj->crcRx = 0U;
+//            // For better performance should not be use with for loop
+//            for(i = 0; i < 5; i++)
+//            {
+//                obj->rxBuff[i] = SCI_readCharBlockingFIFO(obj->sciHandle);
+//                if(i < 4)
+//                {
+//                    obj->crcRx += obj->rxBuff[i];
+//                }
+//            }
+//            obj->crcRx &= 0x00FF;
+//            if(obj->crcRx == obj->rxBuff[4])
+//            {
+//                obj->rxState = RS422_RX_SUCCESS;
+//                obj->successPacket++;
+//                obj->updateRxParamFlag = true;
+//            }
+//            else
+//            {
+//                obj->rxState = RS422_RX_FAILED;
+//                obj->dropPacket++;
+//                obj->updateRxParamFlag = false;
+//            }
+//            SCI_clearOverflowStatus(obj->sciHandle);
+//            SCI_clearInterruptStatus(obj->sciHandle, SCI_INT_RXFF);
+//        }
+//    }
+
+    if(SCI_getRxFIFOStatus(obj->sciHandle) != SCI_FIFO_RX0)
     {
-        obj->rxTimeOutTicker = 0;
-        SCI_clearOverflowStatus(obj->sciHandle);
-        SCI_clearInterruptStatus(obj->sciHandle, SCI_INT_RXFF);
-    }
-    else
-    {
-        obj->rxTimeOutTickerFifo12++;
-    }
-    // The first time out
-    if(obj->rxTimeOutTickerFifo12 > 200U)
-    {
-        obj->rxTimeOutTickerFifo12 = 0U;
-        if(SCI_getRxFIFOStatus(obj->sciHandle) == SCI_FIFO_RX5)
+        obj->rxTimeOutTicker = 0U;
+
+        if(SCI_getRxFIFOStatus(obj->sciHandle) == SCI_FIFO_RX13)
         {
-            obj->rxTimeOutTicker = 0;
-            obj->crcRx = 0U;
-            // For better performance should not be use with for loop
-            for(i = 0; i < 5; i++)
-            {
-                obj->rxBuff[i] = SCI_readCharBlockingFIFO(obj->sciHandle);
-                if(i < 4)
-                {
-                    obj->crcRx += obj->rxBuff[i];
-                }
-            }
-            obj->crcRx &= 0x00FF;
-            if(obj->crcRx == obj->rxBuff[4])
-            {
-                obj->rxState = RS422_RX_SUCCESS;
-                obj->successPacket++;
-                obj->updateRxParamFlag = true;
-            }
-            else
-            {
-                obj->rxState = RS422_RX_FAILED;
-                obj->dropPacket++;
-                obj->updateRxParamFlag = false;
-            }
             SCI_clearOverflowStatus(obj->sciHandle);
             SCI_clearInterruptStatus(obj->sciHandle, SCI_INT_RXFF);
         }
+        else
+        {
+            obj->rxTimeOutTickerFifo12++;
+        }
+        if(obj->rxTimeOutTickerFifo12 > 2000) // wait timeout 1s
+        {
+            obj->rxTimeOutTickerFifo12 = 0U;
+            if(SCI_getRxFIFOStatus(obj->sciHandle) == SCI_FIFO_RX5)
+            {
+                obj->crcRx = 0U;
+                // For better performance should not be use with for loop
+                for(i = 0; i < 5; i++)
+                {
+                    obj->rxBuff[i] = SCI_readCharBlockingFIFO(obj->sciHandle);
+                    if(i < 4)
+                    {
+                        obj->crcRx += obj->rxBuff[i];
+                    }
+                }
+                obj->crcRx &= 0x00FF;
+                if(obj->crcRx == obj->rxBuff[4])
+                {
+                    obj->rxState = RS422_RX_SUCCESS;
+                    obj->successPacket++;
+                    obj->updateRxParamFlag = true;
+                }
+                else
+                {
+                    obj->rxState = RS422_RX_FAILED;
+                    obj->dropPacket++;
+                    obj->updateRxParamFlag = false;
+                }
+                SCI_clearOverflowStatus(obj->sciHandle);
+                SCI_clearInterruptStatus(obj->sciHandle, SCI_INT_RXFF);
+            }
+        }
     }
 
-    if(obj->rxTimeOutTicker > 3000)
+    if(obj->rxTimeOutTicker > 5000) // 3s
     {
         obj->rxTimeOutTicker = 0U;
         // Reset the RX
