@@ -27,8 +27,9 @@ typedef struct
 void task1(void *eventData);
 void updateTxBuff(RS422_COMM_SCI_Handle handle);
 void updateRxParam(RS422_COMM_SCI_Handle handle);
-float32_t speedFbk = 0.0f;
-float32_t speedRef = 0.0f;
+float32_t speedFbk = 9100.0f;
+float32_t speedRef = 9100.0f;
+uint16_t  state = 1;
 float32_t iRms = 0.5;
 
 SYSTEM_TIME_t sysTime;
@@ -59,6 +60,7 @@ void main(void)
 
     //
     // Board Initialization
+    DEVICE_DELAY_US(5000000);
     //
     //Board_init();
     rs422Handle = RS422_COMM_SCI_init(&rs422Obj, sizeof(rs422Obj));
@@ -110,13 +112,13 @@ void updateTxBuff(RS422_COMM_SCI_Handle handle)
             obj->txBuff[0] = 0x00FE & 0x00FF; // header 1
             obj->txBuff[1] = 0x00AA & 0x00FF; // header 2
 
-            temp = (uint16_t) 1;
+            temp = (uint16_t) state;
             obj->txBuff[2] = temp & 0x00FF;  // pump state
 
-            speedRef = 9100.0f;
+
             temp = (uint16_t) (speedRef / 100.0f);
             obj->txBuff[3] = temp & 0x00FF; // pump speed in RPM
-            speedFbk = 9100.0f;
+
             temp = (uint16_t) (speedFbk / 100.0f);
             obj->txBuff[4] = temp & 0x00FF; // pump speed fbk
 
@@ -172,13 +174,14 @@ void updateTxBuff(RS422_COMM_SCI_Handle handle)
             obj->txBuff[10] = 0; // fault bit
 
             obj->txBuff[11] = 0; // reserve
+            obj->txBuff[12] = 0; // reserve 1
 
-            for(i = 0; i < 12; i++)
+            for(i = 0; i < 13; i++)
             {
                 obj->crcTx += obj->txBuff[i];
             }
             temp = obj->crcTx;
-            obj->txBuff[12] = temp & 0x00FF;
+            obj->txBuff[13] = temp & 0x00FF;
 
         }
             break;
@@ -213,7 +216,8 @@ void updateRxParam(RS422_COMM_SCI_Handle handle)
                 }
                 else
                 {
-
+                          state  =    obj->rxBuff[2];  // command
+                          speedRef = (float32_t)obj->rxBuff[3]*100.0f; // speed ref
                 }
             }
                 obj->rxState = RS422_RX_WAITING;
@@ -230,7 +234,7 @@ void task1(void *eventData)
         // update the tx buff
         updateTxBuff(rs422Handle);
         //
-        if(sysTime.timeBaseTask1 > 1000)  // 1s
+        if(sysTime.timeBaseTask1 > 50)  // 50ms
         {
             GPIO_togglePin(DEVICE_GPIO_PIN_LED1);
             RS422_COMM_SCI_write(rs422Handle);
