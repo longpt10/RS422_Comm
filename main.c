@@ -24,6 +24,21 @@ typedef struct
     uint16_t timeBaseTask3;
 }SYSTEM_TIME_t;
 
+typedef struct
+{
+   float32_t  iBandwidth;
+   float32_t  rs;
+   float32_t  ls;
+   float32_t  polepairs;
+   float32_t  maxSpeed;
+   float32_t  kTorque;
+   float32_t  fcLpfSpeed;
+   float32_t  kpSpeed;
+   float32_t  kiSpeed;
+   float32_t  kdSpeed;
+   float32_t  Uminmax;
+}FLASH_DATA_t;
+
 void task1(void *eventData);
 void updateTxBuff(RS422_COMM_SCI_Handle handle);
 void updateRxParam(RS422_COMM_SCI_Handle handle);
@@ -33,6 +48,7 @@ uint16_t  state = 1;
 float32_t iRms = 0.5;
 
 SYSTEM_TIME_t sysTime;
+FLASH_DATA_t  flashData;
 //
 // Main
 //
@@ -72,6 +88,17 @@ void main(void)
     //
     Interrupt_enableMaster();
 
+    flashData.iBandwidth = 3000.0f;
+    flashData.rs = 0.027f; // Ohm
+    flashData.ls = 0.039f; // mH
+    flashData.polepairs = 1.0f;
+    flashData.maxSpeed = 12000.0f; // RMP
+    flashData.kTorque = 8.3f;
+    flashData.fcLpfSpeed = 200.0f;
+    flashData.kpSpeed = 0.3f;
+    flashData.kiSpeed = 0.1f;
+    flashData.kdSpeed = 0.2f;
+    flashData.Uminmax = 0.5f;
 
     //
     // Send Characters forever starting with 0x00 and going through 0xFF.
@@ -142,7 +169,7 @@ void updateTxBuff(RS422_COMM_SCI_Handle handle)
             obj->crcTx = 0U;
             for(i = 0; i < 16; i++)
             {
-             obj->txBuff[i] = 0;
+                obj->txBuff[i] = 0;
             }
             obj->txBuff[0] = 0x00F0 & 0x00FF; // Header 1
             obj->txBuff[1] = 0x00AA & 0x00FF; // header 2
@@ -178,11 +205,10 @@ void updateTxBuff(RS422_COMM_SCI_Handle handle)
 
             for(i = 0; i < 13; i++)
             {
-                obj->crcTx += obj->txBuff[i];
+              obj->crcTx += obj->txBuff[i];
             }
             temp = obj->crcTx;
             obj->txBuff[13] = temp & 0x00FF;
-
         }
             break;
         case RS422_MSG_INFO_FLASH_PUMP_TO_HMI:
@@ -190,8 +216,51 @@ void updateTxBuff(RS422_COMM_SCI_Handle handle)
             obj->crcTx = 0U;
             for(i = 0; i < 16; i++)
             {
-                obj->txBuff[i] = 0;
+             obj->txBuff[i] = 0;
             }
+            obj->txBuff[0] = 0x00F2 & 0x00FF; // Header 1
+            obj->txBuff[1] = 0x00AA & 0x00FF; // header 2
+
+            temp = (uint16_t) (flashData.iBandwidth * 0.01f);
+            obj->txBuff[2] = temp & 0x00FF;  // i bandwidth
+
+            temp = (uint16_t) (flashData.rs * 1000.0f);
+            obj->txBuff[3] = temp & 0x00FF;  // rs
+
+            temp = (uint16_t) (flashData.ls * 1000.0f);
+            obj->txBuff[4] = temp & 0x00FF; // ls
+
+            temp = (uint16_t) (flashData.polepairs * 1.0f);
+            obj->txBuff[5] = temp & 0x00FF; // pole pairs
+
+            temp = (uint16_t) (flashData.maxSpeed * 0.001f);
+            obj->txBuff[6] = temp & 0x00FF; // max speed
+
+            temp = (uint16_t) (flashData.kTorque * 100.0f);
+            obj->txBuff[7] = temp & 0x00FF; // k torque
+
+            temp = (uint16_t) (flashData.fcLpfSpeed * 0.01f);
+            obj->txBuff[8] = temp & 0x00FF; // fc filter
+
+            temp = (uint16_t) (flashData.kpSpeed * 100.0f);
+            obj->txBuff[9] = temp & 0x00FF; // Kp
+
+            temp = (uint16_t) (flashData.kiSpeed * 100.0f);
+            obj->txBuff[10] = temp & 0x00FF; // Ki
+
+            temp = (uint16_t) (flashData.kdSpeed * 100.0f);
+            obj->txBuff[11] = temp & 0x00FF; // Kd
+
+            temp = (uint16_t) (flashData.Uminmax * 100.0f);
+            obj->txBuff[12] = temp & 0x00FF; // Uminmax
+
+            for(i = 0; i < 13; i++)
+            {
+                obj->crcTx += obj->txBuff[i];
+            }
+            temp = obj->crcTx;
+            obj->txBuff[13] = temp & 0x00FF;
+
         }
             break;
         default:
@@ -219,6 +288,29 @@ void updateRxParam(RS422_COMM_SCI_Handle handle)
                           state  =    obj->rxBuff[2];  // command
                           speedRef = (float32_t)obj->rxBuff[3]*100.0f; // speed ref
                 }
+            }
+            else if(((obj->rxBuff[0] & 0x00FF) == 0x00F1) && ((obj->rxBuff[1] & 0x00FF) == 0x00AA)) // write flash
+            {
+                flashData.iBandwidth = (float32_t)obj->rxBuff[2]*100.0f;
+                flashData.rs   = (float32_t)obj->rxBuff[3]/1000.0f;
+                flashData.ls   = (float32_t)obj->rxBuff[4]/1000.0f;
+                flashData.polepairs   = (float32_t)obj->rxBuff[5];
+                flashData.maxSpeed   = (float32_t)obj->rxBuff[6]*1000.0f;
+                flashData.kTorque   = (float32_t)obj->rxBuff[7]/100.0f;
+                flashData.fcLpfSpeed = (float32_t)obj->rxBuff[8]*100.0f;
+                flashData.kpSpeed = (float32_t)obj->rxBuff[9]*100.0f;
+                flashData.kiSpeed = (float32_t)obj->rxBuff[10]*100.0f;
+                flashData.kdSpeed = (float32_t)obj->rxBuff[11]*100.0f;
+                flashData.Uminmax = (float32_t)obj->rxBuff[12]*100.0f;
+
+            }
+            else if(((obj->rxBuff[0] & 0x00FF) == 0x00F2) && ((obj->rxBuff[1] & 0x00FF) == 0x00AA)) // read flash
+            {
+                obj->flashAnsFlag = true;
+            }
+            else
+            {
+
             }
                 obj->rxState = RS422_RX_WAITING;
                 obj->updateRxParamFlag = false;

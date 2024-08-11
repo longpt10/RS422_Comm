@@ -120,7 +120,7 @@ void RS422_COMM_SCI_setup(RS422_COMM_SCI_Handle handle)
 //     The receive FIFO generates an interrupt when FIFO status
 //     bits are greater than equal to 2 out of 16 words
 
-    SCI_setFIFOInterruptLevel(obj->sciHandle, SCI_FIFO_TX13, SCI_FIFO_RX13);
+    SCI_setFIFOInterruptLevel(obj->sciHandle, SCI_FIFO_TX14, SCI_FIFO_RX14);
 
     SCI_performSoftwareReset(obj->sciHandle);
     SCI_resetRxFIFO(obj->sciHandle);
@@ -183,7 +183,7 @@ void RS422_COMM_SCI_write(RS422_COMM_SCI_Handle handle)
                 break;
             case RS422_MSG_INFO_FLASH_PUMP_TO_HMI:
             {
-                for(i = 0; i < 13; i++)
+                for(i = 0; i < 14; i++)
                 {
                    SCI_writeCharNonBlocking(obj->sciHandle, obj->txBuff[i]);
                 }
@@ -218,8 +218,30 @@ void RS422_COMM_SCI_read(RS422_COMM_SCI_Handle handle)
     {
         obj->rxTimeOutTicker = 0U;
 
-        if(SCI_getRxFIFOStatus(obj->sciHandle) == SCI_FIFO_RX13)
+        if(SCI_getRxFIFOStatus(obj->sciHandle) == SCI_FIFO_RX14)
         {
+            // For better performance should not be use with for loop
+            for(i = 0; i < 14; i++)
+            {
+              obj->rxBuff[i] = SCI_readCharBlockingFIFO(obj->sciHandle);
+              if(i < 13)
+              {
+                  obj->crcRx += obj->rxBuff[i];
+              }
+            }
+            obj->crcRx &= 0x00FF;
+            if(obj->crcRx == obj->rxBuff[13])
+            {
+              obj->rxState = RS422_RX_SUCCESS;
+              obj->successPacket++;
+              obj->updateRxParamFlag = true;
+            }
+            else
+            {
+              obj->rxState = RS422_RX_FAILED;
+              obj->dropPacket++;
+              obj->updateRxParamFlag = false;
+            }
             SCI_clearOverflowStatus(obj->sciHandle);
             SCI_clearInterruptStatus(obj->sciHandle, SCI_INT_RXFF);
         }
