@@ -220,6 +220,7 @@ void RS422_COMM_SCI_read(RS422_COMM_SCI_Handle handle)
 
         if(SCI_getRxFIFOStatus(obj->sciHandle) == SCI_FIFO_RX14)
         {
+            obj->crcRx = 0U;
             // For better performance should not be use with for loop
             for(i = 0; i < 14; i++)
             {

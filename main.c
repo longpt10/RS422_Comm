@@ -298,10 +298,10 @@ void updateRxParam(RS422_COMM_SCI_Handle handle)
                 flashData.maxSpeed   = (float32_t)obj->rxBuff[6]*1000.0f;
                 flashData.kTorque   = (float32_t)obj->rxBuff[7]/100.0f;
                 flashData.fcLpfSpeed = (float32_t)obj->rxBuff[8]*100.0f;
-                flashData.kpSpeed = (float32_t)obj->rxBuff[9]*100.0f;
-                flashData.kiSpeed = (float32_t)obj->rxBuff[10]*100.0f;
-                flashData.kdSpeed = (float32_t)obj->rxBuff[11]*100.0f;
-                flashData.Uminmax = (float32_t)obj->rxBuff[12]*100.0f;
+                flashData.kpSpeed = (float32_t)obj->rxBuff[9]/100.0f;
+                flashData.kiSpeed = (float32_t)obj->rxBuff[10]/100.0f;
+                flashData.kdSpeed = (float32_t)obj->rxBuff[11]/100.0f;
+                flashData.Uminmax = (float32_t)obj->rxBuff[12]/100.0f;
 
             }
             else if(((obj->rxBuff[0] & 0x00FF) == 0x00F2) && ((obj->rxBuff[1] & 0x00FF) == 0x00AA)) // read flash
@@ -326,7 +326,7 @@ void task1(void *eventData)
         // update the tx buff
         updateTxBuff(rs422Handle);
         //
-        if(sysTime.timeBaseTask1 > 50)  // 50ms
+        if(sysTime.timeBaseTask1 > 1000)  // 50ms
         {
             GPIO_togglePin(DEVICE_GPIO_PIN_LED1);
             RS422_COMM_SCI_write(rs422Handle);
