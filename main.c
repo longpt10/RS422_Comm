@@ -44,8 +44,10 @@ void updateTxBuff(RS422_COMM_SCI_Handle handle);
 void updateRxParam(RS422_COMM_SCI_Handle handle);
 float32_t speedFbk = 9100.0f;
 float32_t speedRef = 9100.0f;
+float32_t dutyRef = 0.0;
 uint16_t  state = 1;
 float32_t iRms = 0.5;
+float32_t temperature = 60.0f;;
 
 SYSTEM_TIME_t sysTime;
 FLASH_DATA_t  flashData;
@@ -76,7 +78,7 @@ void main(void)
 
     //
     // Board Initialization
-    DEVICE_DELAY_US(5000000);
+    DEVICE_DELAY_US(1000000);
     //
     //Board_init();
     rs422Handle = RS422_COMM_SCI_init(&rs422Obj, sizeof(rs422Obj));
@@ -149,11 +151,13 @@ void updateTxBuff(RS422_COMM_SCI_Handle handle)
             temp = (uint16_t) (speedFbk / 100.0f);
             obj->txBuff[4] = temp & 0x00FF; // pump speed fbk
 
-            iRms = 0.5f;
             temp = (uint16_t) (iRms * 10.0f);
             obj->txBuff[5] = temp & 0x00FF; // pump irms
 
-            obj->txBuff[6] = 0; // temperature and position
+            temp = (uint16_t) (temperature / 2.0f);
+            temp &= 0x003F;
+            temp |= (0 << 6);
+            obj->txBuff[6] = temp & 0x00FF; // temperature and position
 
             for(i = 0; i < 7; i++)
             {
@@ -285,23 +289,30 @@ void updateRxParam(RS422_COMM_SCI_Handle handle)
                 }
                 else
                 {
-                          state  =    obj->rxBuff[2];  // command
-                          speedRef = (float32_t)obj->rxBuff[3]*100.0f; // speed ref
+                          state  =    (obj->rxBuff[2] & 0x00FF);  // command
+                          if( state == 2)
+                          {
+                              speedRef = (float32_t)(obj->rxBuff[3] & 0x00FF)*100.0f; // speed ref
+                          }
+                          else if(state == 3)
+                          {
+                              dutyRef = (float32_t)(obj->rxBuff[3] & 0x00FF)/100.0f;
+                          }
                 }
             }
             else if(((obj->rxBuff[0] & 0x00FF) == 0x00F1) && ((obj->rxBuff[1] & 0x00FF) == 0x00AA)) // write flash
             {
-                flashData.iBandwidth = (float32_t)obj->rxBuff[2]*100.0f;
-                flashData.rs   = (float32_t)obj->rxBuff[3]/1000.0f;
-                flashData.ls   = (float32_t)obj->rxBuff[4]/1000.0f;
-                flashData.polepairs   = (float32_t)obj->rxBuff[5];
-                flashData.maxSpeed   = (float32_t)obj->rxBuff[6]*1000.0f;
-                flashData.kTorque   = (float32_t)obj->rxBuff[7]/100.0f;
-                flashData.fcLpfSpeed = (float32_t)obj->rxBuff[8]*100.0f;
-                flashData.kpSpeed = (float32_t)obj->rxBuff[9]/100.0f;
-                flashData.kiSpeed = (float32_t)obj->rxBuff[10]/100.0f;
-                flashData.kdSpeed = (float32_t)obj->rxBuff[11]/100.0f;
-                flashData.Uminmax = (float32_t)obj->rxBuff[12]/100.0f;
+                flashData.iBandwidth = (float32_t)(obj->rxBuff[2] & 0x00FF)*100.0f;
+                flashData.rs   = (float32_t)(obj->rxBuff[3] & 0x00FF)/1000.0f;
+                flashData.ls   = (float32_t)(obj->rxBuff[4] & 0x00FF)/1000.0f;
+                flashData.polepairs   = (float32_t)(obj->rxBuff[5] & 0x00FF);
+                flashData.maxSpeed   = (float32_t)(obj->rxBuff[6] & 0x00FF)*1000.0f;
+                flashData.kTorque   = (float32_t)(obj->rxBuff[7] & 0x00FF)/100.0f;
+                flashData.fcLpfSpeed = (float32_t)(obj->rxBuff[8] & 0x00FF)*100.0f;
+                flashData.kpSpeed = (float32_t)(obj->rxBuff[9] & 0x00FF)/100.0f;
+                flashData.kiSpeed = (float32_t)(obj->rxBuff[10] & 0x00FF)/100.0f;
+                flashData.kdSpeed = (float32_t)(obj->rxBuff[11] & 0x00FF)/100.0f;
+                flashData.Uminmax = (float32_t)(obj->rxBuff[12] & 0x00FF)/100.0f;
 
             }
             else if(((obj->rxBuff[0] & 0x00FF) == 0x00F2) && ((obj->rxBuff[1] & 0x00FF) == 0x00AA)) // read flash
@@ -326,7 +337,7 @@ void task1(void *eventData)
         // update the tx buff
         updateTxBuff(rs422Handle);
         //
-        if(sysTime.timeBaseTask1 > 1000)  // 50ms
+        if(sysTime.timeBaseTask1 > 50)  // 50ms
         {
             GPIO_togglePin(DEVICE_GPIO_PIN_LED1);
             RS422_COMM_SCI_write(rs422Handle);
