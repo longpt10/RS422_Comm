@@ -196,7 +196,7 @@ void updateTxBuff(RS422_COMM_SCI_Handle handle)
             temp = (uint16_t) (0.51f * 100.0f);
             obj->txBuff[7] = temp & 0x00FF; // i offset C
 
-            temp = (uint16_t) (24.0f * 100.0f);
+            temp = (uint16_t) (24.0f * 10.0f);
             obj->txBuff[8] = temp & 0x00FF; // vdc bus
 
             temp = (uint16_t) 3;
